@@ -4,9 +4,10 @@ import com.twitter.scalding.typed.TypedPipe
 import com.twitter.scalding._
 import com.twitter.scalding.platform.HadoopPlatformJobTest
 import com.twitter.scalding.platform.HadoopPlatformTest
-import org.apache.hadoop.hive.serde2.typeinfo.{StructTypeInfo, TypeInfo, TypeInfoFactory}
 import org.scalatest.{Matchers, WordSpec}
 import scala.language.experimental.macros
+
+import MacroImplicits._
 
 class TypedOrcTupleTest extends WordSpec with Matchers with HadoopPlatformTest {
 
@@ -15,17 +16,14 @@ class TypedOrcTupleTest extends WordSpec with Matchers with HadoopPlatformTest {
     "read and write simple values" in {
       import TestValues._
       import scala.collection.JavaConverters._
-      import com.twitter.scalding.macros.Macros._
-
-      val schema = TypeInfoFactory.getStructTypeInfo(
-        List("0", "1").asJava,
-        List[TypeInfo](TypeInfoFactory.intTypeInfo, TypeInfoFactory.stringTypeInfo).asJava
-      )
 
       HadoopPlatformJobTest(new WriteToTypedOrcTupleJobA(_), cluster)
         .arg("output", "output1")
-        .sink(TypedOrcSink[SampleClassD](Seq("output1"), schema.asInstanceOf[StructTypeInfo])(caseClassTupleConverterWithUnknown[SampleClassD], caseClassTupleSetterWithUnknown[SampleClassD])) { out =>
+        .sink(TypedOrcSink[SampleClassD](Seq("output1"))) { out =>
           out.foreach(println)
+          val map = out.map(sampleClassD => (sampleClassD.x, sampleClassD.y)).toMap
+          map(1) should equal("a")
+          map(2) should equal("b")
         }.run
     }
 
@@ -74,24 +72,20 @@ case class SampleClassF(w: Byte, z: Float)
 
 
 class WriteToTypedOrcTupleJobA(args: Args) extends Job(args) {
-  import com.twitter.scalding.macros.Macros._
   import TypedOrc._
   import scala.collection.JavaConverters._
   val values = Seq(
     SampleClassD(1, "a"),
     SampleClassD(2, "b")
   )
-  val schema = TypeInfoFactory.getStructTypeInfo(
-    List("0", "1").asJava,
-    List[TypeInfo](TypeInfoFactory.intTypeInfo, TypeInfoFactory.stringTypeInfo).asJava
-  )
+  import MacroImplicits._
 
   val outputPath = args.required("output")
 
-  val sink = TypedOrcSink[SampleClassD](Seq(outputPath), schema.asInstanceOf[StructTypeInfo])(caseClassTupleConverterWithUnknown[SampleClassD], caseClassTupleSetterWithUnknown[SampleClassD])
+  val sink = TypedOrcSink[SampleClassD](Seq(outputPath))
   TypedPipe.from(values).write(sink)
 }
-//
+
 //class WriteToTypedOrcTupleJobB(args: Args) extends Job(args) {
 //  import com.twitter.scalding.macros.Macros._
 //  import TestValues._
@@ -101,7 +95,7 @@ class WriteToTypedOrcTupleJobA(args: Args) extends Job(args) {
 //  val sink = TypedOrcSink[SampleClassB](outputPath)
 //  TypedPipe.from(values).write(sink)
 //}
-//
+
 //class ReadWithFilterPredicateJob(args: Args) extends Job(args) {
 //  import com.twitter.scalding.macros.Macros._
 //  //val fp: FilterPredicate = FilterApi.eq(binaryColumn("string"), Binary.fromString("B1"))
