@@ -1,9 +1,7 @@
 package io.applicative.scalding.orc
 
 import com.twitter.scalding.{TupleConverter, TupleSetter}
-import com.twitter.scalding.macros.impl.{TupleConverterImpl, TupleSetterImpl}
-import io.applicative.scalding.orc.impl.SchemaTypeImpl
-import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo
+import io.applicative.scalding.orc.impl._
 
 import scala.language.experimental.macros
 
