@@ -42,27 +42,39 @@ object SchemaTypeImpl {
             matchField(tpe.asInstanceOf[TypeRefApi].args.head, fieldName, q"$cacheName")
 
           (q"""$fieldName""", q"""$subTree""")
-        case tpe if tpe.erasure <:< typeOf[Map[Any, Any]] => // Handle maps
+        case tpe if tpe <:< typeOf[Map[_, _]] => // Handle maps
           val cacheName = TermName(c.freshName(s"mapIndx"))
           val typParams = tpe.asInstanceOf[TypeRefApi].args
           val (_, keyTree) = matchField(typParams.head, fieldName, q"$cacheName")
           val (_, valTree) = matchField(typParams.tail.head, fieldName, q"$cacheName")
           simpleType(q"_root_.org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getMapTypeInfo($keyTree, $valTree)")
-        case tpe if tpe.erasure <:< typeOf[TraversableOnce[Any]] => // Handle any iterable as list
+        case tpe if tpe.erasure <:< typeOf[TraversableOnce[Any]] =>
+          // Handle any iterable as list. Arrays are a special case
           val cacheName = TermName(c.freshName(s"listIndx"))
           val (_, elementTree) =
             matchField(tpe.asInstanceOf[TypeRefApi].args.head, fieldName, q"$cacheName")
           simpleType(q"_root_.org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getListTypeInfo($elementTree)")
+        case tpe if tpe <:< typeOf[Array[_]] =>
+          // Arrays are a special case, also handles an array of Bytes
+          val cacheName = TermName(c.freshName(s"listIndx"))
+          val typParam = tpe.asInstanceOf[TypeRefApi].args.head
+          val (_, elementTree) =
+            matchField(typParam, fieldName, q"$cacheName")
+          if (typParam =:= typeOf[Byte]) {
+            simpleType(q"_root_.org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.binaryTypeInfo")
+          } else {
+            simpleType(q"_root_.org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getListTypeInfo($elementTree)")
+          }
         case tpe if IsCaseClassImpl.isCaseClassType(c)(tpe) =>
-          val caseClassExp = expandMethod(tpe, fieldName, pTree)
+          val caseClassExp = expandMethod(tpe.erasure, fieldName, pTree)
           val caseClassNames = caseClassExp.map(_._1)
           val caseClassTypes = caseClassExp.map(_._2)
           simpleType(q"""_root_.org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getStructTypeInfo(
-            _root_.java.util.Arrays.asList($caseClassNames),
-            _root_.java.util.Arrays.asList($caseClassTypes)
+            _root_.java.util.Arrays.asList(..$caseClassNames),
+            _root_.java.util.Arrays.asList(..$caseClassTypes)
           )""")
 //        case tpe if allowUnknownTypes => simpleType(q"tup.set")
-        case _ => c.abort(c.enclosingPosition, s"Case class ${T} is not pure primitives, Option of a primitive nested case classes")
+        case _ => c.abort(c.enclosingPosition, s"Case class ${T} is not pure primitives, Option of a primitive nested case classes") // TODO: better error message
       }
     }
 

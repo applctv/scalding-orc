@@ -13,15 +13,10 @@ import com.twitter.bijection.macros.impl.IsCaseClassImpl
  * a separate compilation unit, which makes it easier to provide helper methods interfacing with macros.
  */
 object TupleSetterImpl {
-
-  def caseClassTupleSetterImpl[T](c: Context)(implicit T: c.WeakTypeTag[T]): c.Expr[TupleSetter[T]] =
-    caseClassTupleSetterCommonImpl(c, false)
-
-  def caseClassTupleSetterWithUnknownImpl[T](c: Context)(implicit T: c.WeakTypeTag[T]): c.Expr[TupleSetter[T]] =
-    caseClassTupleSetterCommonImpl(c, true)
-
-  def caseClassTupleSetterCommonImpl[T](c: Context, allowUnknownTypes: Boolean)(implicit T: c.WeakTypeTag[T]): c.Expr[TupleSetter[T]] = {
+  def caseClassTupleSetterImpl[T](c: Context)(implicit T: c.WeakTypeTag[T]): c.Expr[TupleSetter[T]] = {
     import c.universe._
+
+    val allowUnknownTypes: Boolean = true
 
     if (!IsCaseClassImpl.isCaseClassType(c)(T.tpe))
       c.abort(c.enclosingPosition, s"""We cannot enforce ${T.tpe} is a case class, either it is not a case class or this macro call is possibly enclosed in a class.

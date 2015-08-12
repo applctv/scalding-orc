@@ -53,24 +53,24 @@ class TypedOrcTupleTest extends WordSpec with Matchers with HadoopPlatformTest {
         }.run
     }
 
-//    "read and write correctly" in {
-//      import TestValues._
-//      import MacroImplicits._
+    "read and write correctly" in {
+      import TestValues._
+      import MacroImplicits._
+
+      def toMap[T](i: Iterable[T]): Map[T, Int] = i.groupBy(identity).mapValues(_.size)
+
+      HadoopPlatformJobTest(new WriteToTypedOrcTupleJobB(_), cluster)
+        .arg("output", "output1")
+        .sink[SampleClassB](TypedOrc[SampleClassB](Seq("output1"))) {
+        toMap(_) shouldBe toMap(values)
+      }.run
 //
-//      def toMap[T](i: Iterable[T]): Map[T, Int] = i.groupBy(identity).mapValues(_.size)
-//
-//      HadoopPlatformJobTest(new WriteToTypedOrcTupleJobB(_), cluster)
-//        .arg("output", "output1")
-//        .sink[SampleClassB](TypedOrc[SampleClassB](Seq("output1"))) {
-//        toMap(_) shouldBe toMap(values)
-//      }.run
-////
-////      HadoopPlatformJobTest(new ReadWithFilterPredicateJob(_), cluster)
-////        .arg("input", "output1")
-////        .arg("output", "output2")
-////        .sink[Boolean]("output2") { toMap(_) shouldBe toMap(values.filter(_.string == "B1").map(_.a.bool)) }
-////        .run
-//    }
+//      HadoopPlatformJobTest(new ReadWithFilterPredicateJob(_), cluster)
+//        .arg("input", "output1")
+//        .arg("output", "output2")
+//        .sink[Boolean]("output2") { toMap(_) shouldBe toMap(values.filter(_.string == "B1").map(_.a.bool)) }
+//        .run
+    }
   }
 }
 
@@ -113,10 +113,10 @@ case class SampleClassE(a: String)
  * "map": [{"key": "chani", "value": {"int1": 5, "string1": "chani"}}, {"key": "mauddib", "value": {"int1": 1, "string1": "mauddib"}}]}
 * */
 case class ReadSample(boolean1: Boolean, byte1: Byte, short1: Short, int1: Int, long1: Long,
-                      float1: Float, double1: Double, bytes1: Array[Byte], string1: String)
-                      // FIXME: ADD
-                      //middle: Middle, list: List[(Int, String)], map: Map[String, (Int, String)])
-case class Middle(list: List[(Int, String)])
+                      float1: Float, double1: Double, bytes1: Array[Byte], string1: String,
+                      middle: Middle, list: List[IntStr], map: Map[String, IntStr])
+case class Middle(list: List[IntStr])
+case class IntStr(int1: Int, string1: String)
 
 class ReadSampleJob(args: Args) extends Job(args) {
   import MacroImplicits._
@@ -125,8 +125,7 @@ class ReadSampleJob(args: Args) extends Job(args) {
 
   TypedPipe
     .from(TypedOrc[ReadSample]("src/test/resources/sample.orc"))
-    .debug
-    .map((r: ReadSample) => r.string1)
+    .map(r => r.string1)
     .write(TypedTsv[String](outputPath))
 }
 
@@ -162,15 +161,15 @@ class WriteToTypedOrcTupleJobE(args: Args) extends Job(args) {
   TypedPipe.from(values).write(sink)
 }
 
-//class WriteToTypedOrcTupleJobB(args: Args) extends Job(args) {
-//  import com.twitter.scalding.macros.Macros._
-//  import TestValues._
-//
-//  val outputPath = args.required("output")
-//
-//  val sink = TypedOrcSink[SampleClassB](outputPath)
-//  TypedPipe.from(values).write(sink)
-//}
+class WriteToTypedOrcTupleJobB(args: Args) extends Job(args) {
+  import TestValues._
+  import MacroImplicits._
+
+  val outputPath = args.required("output")
+
+  val sink = TypedOrc[SampleClassB](outputPath)
+  TypedPipe.from(values).write(sink)
+}
 
 //class ReadWithFilterPredicateJob(args: Args) extends Job(args) {
 //  import com.twitter.scalding.macros.Macros._

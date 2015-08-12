@@ -2,7 +2,6 @@ package io.applicative.scalding.orc.impl
 
 import scala.language.experimental.macros
 import scala.reflect.macros.Context
-import scala.util.Random
 
 import com.twitter.scalding._
 import com.twitter.bijection.macros.{ IsCaseClass, MacroGenerated }
@@ -15,14 +14,10 @@ import com.twitter.bijection.macros.impl.IsCaseClassImpl
  */
 
 object TupleConverterImpl {
-  def caseClassTupleConverterImpl[T](c: Context)(implicit T: c.WeakTypeTag[T]): c.Expr[TupleConverter[T]] =
-    caseClassTupleConverterCommonImpl(c, false)
-
-  def caseClassTupleConverterWithUnknownImpl[T](c: Context)(implicit T: c.WeakTypeTag[T]): c.Expr[TupleConverter[T]] =
-    caseClassTupleConverterCommonImpl(c, true)
-
-  def caseClassTupleConverterCommonImpl[T](c: Context, allowUnknownTypes: Boolean)(implicit T: c.WeakTypeTag[T]): c.Expr[TupleConverter[T]] = {
+  def caseClassTupleConverterImpl[T](c: Context)(implicit T: c.WeakTypeTag[T]): c.Expr[TupleConverter[T]] = {
     import c.universe._
+
+    val allowUnknownTypes: Boolean = true
 
     if (!IsCaseClassImpl.isCaseClassType(c)(T.tpe))
       c.abort(c.enclosingPosition, s"""We cannot enforce ${T.tpe} is a case class, either it is not a case class or this macro call is possibly enclosed in a class.
@@ -68,7 +63,38 @@ object TupleConverterImpl {
         case tpe if tpe =:= typeOf[Long] => getPrimitive(q"""t.getLong(${idx})""", typeOf[java.lang.Long], Some(q"_root_.java.lang.Long.valueOf"))
         case tpe if tpe =:= typeOf[Float] => getPrimitive(q"""t.getFloat(${idx})""", typeOf[java.lang.Float], Some(q"_root_.java.lang.Float.valueOf"))
         case tpe if tpe =:= typeOf[Double] => getPrimitive(q"""t.getDouble(${idx})""", typeOf[java.lang.Double], Some(q"_root_.java.lang.Double.valueOf"))
-        case tpe if tpe =:= typeOf[java.sql.Timestamp] => getPrimitive(q"""t.getObject(${idx}).asInstanceOf[_root_.java.sql.Timestamp]""", typeOf[java.sql.Timestamp], None)
+        //case tpe if tpe =:= typeOf[java.sql.Timestamp] => getPrimitive(q"""t.getObject(${idx}).asInstanceOf[_root_.java.sql.Timestamp]""", typeOf[java.sql.Timestamp], None)
+        // The TupleEntry has been created by Corc uses Java collections. We need to convert types, simple casting blows up.
+        case tpe if tpe.erasure <:< weakTypeOf[Map[_,_]] => // Handle maps. Has to be a WeakTypeOf, otherwise no TypeTag found
+          val typParams = tpe.asInstanceOf[TypeRefApi].args
+          val keyParam = typParams.head
+          val valueParam = typParams.tail.head
+          getPrimitive(
+            q"""
+              _root_.scala.collection.JavaConverters.mapAsScalaMapConverter[$keyParam, $valueParam](t.getObject(${idx})
+                .asInstanceOf[_root_.java.util.Map[$keyParam, $valueParam]])
+                .asScala
+                .toMap
+              """, tpe, None)
+        //                .to[${tpe.typeConstructor}] Doesn't work due to #of type params
+        case tpe if tpe.erasure <:< typeOf[TraversableOnce[Any]] =>
+          // Handle any iterable as list. Arrays are a special case
+          val typParam = tpe.asInstanceOf[TypeRefApi].args.head
+          getPrimitive(
+            q"""
+              _root_.scala.collection.JavaConverters.asScalaBufferConverter[$typParam](t.getObject(${idx})
+              .asInstanceOf[_root_.java.util.List[$typParam]])
+              .asScala
+              .to[${tpe.typeConstructor}]
+              """, tpe, None)
+        case tpe if tpe.erasure <:< typeOf[Array[Any]] =>
+          // Arrays are a special case, also handles an array of Bytes
+          val typParam = tpe.asInstanceOf[TypeRefApi].args.head
+          if (typParam =:= typeOf[Byte]) {
+            getPrimitive(q"""t.getObject(${idx}).asInstanceOf[_root_.org.apache.hadoop.io.BytesWritable].getBytes""", tpe, None)
+          } else {
+            getPrimitive(q"""_root_.scala.collection.JavaConverters.asScalaBufferConverter[$typParam](t.getObject(${idx}).asInstanceOf[_root_.java.util.List[$typParam]]).asScala.toArray""", tpe, None)
+          }
         case tpe if tpe.erasure =:= typeOf[Option[Any]] && inOption =>
           c.abort(c.enclosingPosition, s"Nested options do not make sense being mapped onto a tuple fields in cascading.")
 
@@ -93,7 +119,7 @@ object TupleConverterImpl {
           (newIdx, Extractor(tpe, q"""$cachedResult"""), builders :+ build)
         case tpe if IsCaseClassImpl.isCaseClassType(c)(tpe) => expandCaseClass(tpe, idx, inOption)
         case tpe if allowUnknownTypes => getPrimitive(q"""t.getObject(${idx}).asInstanceOf[$tpe]""", tpe, None)
-        case _ => c.abort(c.enclosingPosition, s"Case class ${T} is not pure primitives, Option of a primitive nested case classes")
+        case _ => c.abort(c.enclosingPosition, s"Case class ${T} is not pure primitives, Option of a primitive nested case classes") // TODO: better error message
       }
     }
 

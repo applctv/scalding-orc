@@ -3,6 +3,7 @@ package io.applicative.scalding.orc
 import cascading.scheme.Scheme
 import cascading.tuple.Fields
 import com.hotels.corc.cascading.{CascadingConverterFactory, OrcFile}
+import com.twitter.bijection.macros.MacroGenerated
 import com.twitter.scalding.typed.{TypedSource, TypedSink}
 import com.twitter.scalding._
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument
@@ -81,6 +82,14 @@ trait TypedOrc[T] extends FileSource with Mappable[T]
       case Read => scheme = readScheme
       case Write => scheme = writeScheme
     }
+
+    if (!converter.getClass.getInterfaces.contains(classOf[MacroGenerated])) {
+      throw new Exception("Failed to generate proper converter - check implicits") // TODO: Better message
+    }
+    if (!setter.getClass.getInterfaces.contains(classOf[MacroGenerated])) {
+      throw new Exception("Failed to generate proper setter - check implicits") // TODO: Better message
+    }
+
     super.createTap(readOrWrite)(mode)
   }
 
