@@ -1,5 +1,7 @@
 package io.applicative.scalding.orc
 
+import java.io.File
+
 import cascading.operation.DebugLevel
 import com.twitter.scalding.typed.TypedPipe
 import com.twitter.scalding._
@@ -45,11 +47,14 @@ class TypedOrcTupleTest extends WordSpec with Matchers with HadoopPlatformTest {
       import TestValues._
       import scala.collection.JavaConverters._
 
+      cluster.putFile(new File("src/test/resources/sample.orc"), "sample.orc")
+
       HadoopPlatformJobTest(new ReadSampleJob(_), cluster)
         .arg("output", "output1")
         .sink(TypedTsv[String]("output1")) { out =>
-          out.foreach(println)
           out.size should be(2)
+          out.head should be("hi")
+          out.tail.head should be("bye")
         }.run
     }
 
@@ -124,7 +129,7 @@ class ReadSampleJob(args: Args) extends Job(args) {
   val outputPath = args.required("output")
 
   TypedPipe
-    .from(TypedOrc[ReadSample]("src/test/resources/sample.orc"))
+    .from(TypedOrc[ReadSample]("sample.orc"))
     .map(r => r.string1)
     .write(TypedTsv[String](outputPath))
 }

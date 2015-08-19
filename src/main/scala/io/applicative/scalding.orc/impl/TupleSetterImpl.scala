@@ -26,6 +26,84 @@ object TupleSetterImpl {
       def simpleType(accessor: Tree) =
         (idx + 1, q"""${accessor}(${idx}, $pTree)""")
 
+      // Expand out a case class that is used in a List
+      def classParameter(typParam: Type, el: Tree): (Type, Tree) = {
+        typParam match {
+          case tpe if IsCaseClassImpl.isCaseClassType(c)(tpe) => {
+            val cacheName = TermName(c.freshName(s"classParam"))
+            val (innerIndex, iTree) = expandMethod(tpe, 0, q"v", cacheName)
+            val tupleType = typeOf[java.util.List[Object]]
+            (tupleType, q"""
+               _root_.scala.collection.JavaConverters.seqAsJavaListConverter[$tupleType](
+                 $el.map { v =>
+                   val $cacheName = _root_.cascading.tuple.Tuple.size($innerIndex)
+                   $iTree
+                   _root_.cascading.tuple.Tuple.elements($cacheName)
+                 }.toSeq
+               ).asJava
+               """)
+          }
+          case _ => (typParam, q"_root_.scala.collection.JavaConverters.seqAsJavaListConverter[$typParam]($el.toSeq).asJava")
+        }
+      }
+
+      // Expand map type
+      // TODO: Refactor with the method above to reduce duplication
+      def classParameterMap(typParam: (Type, Type), el: Tree): ((Type, Type), Tree) = {
+        typParam match {
+          case (keyTpe, valTpe)
+            if !IsCaseClassImpl.isCaseClassType(c)(keyTpe) && IsCaseClassImpl.isCaseClassType(c)(valTpe) => {
+            val cacheName = TermName(c.freshName(s"classParam"))
+            val (innerIndex, iTree) = expandMethod(keyTpe, 0, q"v._2", cacheName)
+            val tupleType = typeOf[java.util.List[Object]]
+            ((keyTpe, tupleType), q"""
+               _root_.scala.collection.JavaConverters.mapAsJavaMapConverter[$keyTpe, $tupleType](
+                 $el.map { v =>
+                   val $cacheName = _root_.cascading.tuple.Tuple.size($innerIndex)
+                   $iTree
+                   (v._1, _root_.cascading.tuple.Tuple.elements($cacheName))
+                 }
+               ).asJava
+               """)
+          }
+          case (keyTpe, valTpe)
+            if IsCaseClassImpl.isCaseClassType(c)(keyTpe) && !IsCaseClassImpl.isCaseClassType(c)(valTpe) => {
+            val cacheName = TermName(c.freshName(s"classParam"))
+            val (innerIndex, iTree) = expandMethod(keyTpe, 0, q"v._1", cacheName)
+            val tupleType = typeOf[java.util.List[Object]]
+            ((tupleType, valTpe), q"""
+               _root_.scala.collection.JavaConverters.mapAsJavaMapConverter[$tupleType, $valTpe](
+                 $el.map { v =>
+                   val $cacheName = _root_.cascading.tuple.Tuple.size($innerIndex)
+                   $iTree
+                   (_root_.cascading.tuple.Tuple.elements($cacheName), v._2)
+                 }
+               ).asJava
+               """)
+          }
+          case (keyTpe, valTpe)
+            if IsCaseClassImpl.isCaseClassType(c)(keyTpe) && IsCaseClassImpl.isCaseClassType(c)(valTpe) => {
+            val keyCacheName = TermName(c.freshName(s"keyClassParam"))
+            val valCacheName = TermName(c.freshName(s"valClassParam"))
+            val (keyInnerIndex, keyTree) = expandMethod(keyTpe, 0, q"v._1", keyCacheName)
+            val (valInnerIndex, valTree) = expandMethod(valTpe, 0, q"v._2", valCacheName)
+            val tupleType = typeOf[java.util.List[Object]]
+            ((tupleType, tupleType), q"""
+               _root_.scala.collection.JavaConverters.mapAsJavaMapConverter[$tupleType, $tupleType](
+                 $el.map { v =>
+                   val $keyCacheName = _root_.cascading.tuple.Tuple.size($keyInnerIndex)
+                   val $valCacheName = _root_.cascading.tuple.Tuple.size($valInnerIndex)
+                   $keyTree
+                   $valTree
+                   (_root_.cascading.tuple.Tuple.elements($keyCacheName), _root_.cascading.tuple.Tuple.elements($valCacheName))
+                 }
+               ).asJava
+               """)
+          }
+          case _ => (typParam, q"_root_.scala.collection.JavaConverters.mapAsJavaMapConverter[${typParam._1}, ${typParam._2}]($el).asJava")
+        }
+      }
+
       outerTpe match {
         case tpe if tpe =:= typeOf[String] => simpleType(q"$name.setString")
         case tpe if tpe =:= typeOf[Boolean] => simpleType(q"$name.setBoolean")
@@ -36,19 +114,13 @@ object TupleSetterImpl {
         case tpe if tpe =:= typeOf[Double] => simpleType(q"$name.setDouble")
         case tpe if tpe =:= typeOf[java.sql.Timestamp] => simpleType(q"$name.set")
         case tpe if tpe.erasure <:< weakTypeOf[Map[_,_]] => // Handle maps. Has to be a WeakTypeOf, otherwise no TypeTag found
-          //FIXME: if type parameters are case classes, setting fails. need to convert them to lists
           val typParams = tpe.asInstanceOf[TypeRefApi].args
-          val keyParam = typParams.head
-          val valueParam = typParams.tail.head
-          (idx + 1,
-            q"""$name.set(${idx}, _root_.scala.collection.JavaConverters.mapAsJavaMapConverter[$keyParam, $valueParam]($pTree).asJava)"""
-            )
+          val (_, el) = classParameterMap((typParams.head, typParams.tail.head), pTree)
+          (idx + 1, q"$name.set(${idx}, $el)")
         case tpe if tpe.erasure <:< typeOf[TraversableOnce[Any]] =>
           // Handle any iterable as list. Arrays are a special case
-          val typParam = tpe.asInstanceOf[TypeRefApi].args.head
-          (idx + 1,
-            q"""$name.set(${idx}, _root_.scala.collection.JavaConverters.seqAsJavaListConverter[$typParam]($pTree.toSeq).asJava)"""
-            )
+          val (typParam, el) = classParameter(tpe.asInstanceOf[TypeRefApi].args.head, pTree)
+          (idx + 1, q"""$name.set(${idx}, $el)""")
         case tpe if tpe.erasure <:< typeOf[Array[Any]] =>
           // Arrays are a special case, also handles an array of Bytes
           val typParam = tpe.asInstanceOf[TypeRefApi].args.head
@@ -57,8 +129,9 @@ object TupleSetterImpl {
               q"""$name.set(${idx}, new _root_.org.apache.hadoop.io.BytesWritable($pTree))"""
               )
           } else {
+            val (_, el) = classParameter(typParam, pTree)
             (idx + 1,
-              q"""$name.set(${idx}, _root_.scala.collection.JavaConverters.seqAsJavaListConverter[$typParam]($pTree.toSeq).asJava)"""
+              q"""$name.set(${idx}, $el)"""
               )
           }
         case tpe if tpe.erasure =:= typeOf[Option[Any]] =>
