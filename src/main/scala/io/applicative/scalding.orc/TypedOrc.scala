@@ -66,12 +66,15 @@ trait TypedOrc[T] extends FileSource with Mappable[T]
   def converterImpl: TupleConverter[T]
   def setterImpl: TupleSetter[T]
 
-  val fields = Fields.size(schema.get.getAllStructFieldNames.size)
+  //val fields = Fields.size(schema.get.getAllStructFieldNames.size)
   //val fields = new Fields(schema.get.getAllStructFieldNames.asScala: _*)
+  val fields = new Fields(Fields.names(schema.get.getAllStructFieldNames.asScala: _*): _*)
   var scheme: OrcFile = _
 
-  def readScheme = new OrcFile(schema.get, withFilter.orNull, fields, schema.get, new CascadingConverterFactory)
+  def readScheme = new OrcFile(schema.get, withFilter.orNull, fields, /*FIXME: Null to read schema from file. Required for column pruning*/schema.get, new CascadingConverterFactory)
   def writeScheme = new OrcFile(fields, schema.get, new CascadingConverterFactory)
+
+  override def sinkFields: Fields = fields
 
   override def converter[U >: T] = TupleConverter.asSuperConverter[T, U](converterImpl)
 

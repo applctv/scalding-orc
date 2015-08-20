@@ -96,8 +96,8 @@ object SchemaTypeImpl {
         }.toList
 
     val set = expandMethod(T.tpe, "", q"t")
-    //val fields = set.map(_._1) // TODO: A cleaner way to get at this
-    val fields = (0 until set.size).map(_.toString)
+    val fields = set.map(_._1) // TODO: A cleaner way to get at this
+    //val fields = (0 until set.size).map(_.toString)
     val types = set.map(_._2)
     //if (finalIdx == 0) c.abort(c.enclosingPosition, "Didn't consume any elements in the tuple, possibly empty case class?")
     val res = q"""
