@@ -66,12 +66,12 @@ trait TypedOrc[T] extends FileSource with Mappable[T]
   def converterImpl: TupleConverter[T]
   def setterImpl: TupleSetter[T]
 
-  //val fields = Fields.size(schema.get.getAllStructFieldNames.size)
-  //val fields = new Fields(schema.get.getAllStructFieldNames.asScala: _*)
   val fields = new Fields(Fields.names(schema.get.getAllStructFieldNames.asScala: _*): _*)
   var scheme: OrcFile = _
 
-  def readScheme = new OrcFile(schema.get, withFilter.orNull, fields, /*FIXME: Null to read schema from file. Required for column pruning*/schema.get, new CascadingConverterFactory)
+  /* SchemaTypeInfo is Null to read schema from file. Required for column pruning*/
+  //def readScheme = new OrcFile(schema.get, withFilter.orNull, fields, schema.get, new CascadingConverterFactory)
+  def readScheme = new OrcFile(schema.get, withFilter.orNull, fields, null, new CascadingConverterFactory)
   def writeScheme = new OrcFile(fields, schema.get, new CascadingConverterFactory)
 
   override def sinkFields: Fields = fields
@@ -97,55 +97,16 @@ trait TypedOrc[T] extends FileSource with Mappable[T]
   }
 
   override def hdfsScheme = HadoopSchemeInstance(scheme.asInstanceOf[Scheme[_, _, _, _, _]])
-
-//  override def hdfsScheme = {
-//    import scala.collection.JavaConverters._
-//    //val scheme = new OrcFile(Fields.size(schema.getAllStructFieldNames.size), schema, new CascadingConverterFactory)
-////    val names = schema.getAllStructFieldNames.asScala
-////    val fields = new Fields(names: _*)
-//
-//    HadoopSchemeInstance(scheme.asInstanceOf[Scheme[_, _, _, _, _]])
-//  }
 }
-
-/*
- * Trying to unify the two
-
-trait TypedOrcSource[T] extends FileSource with Mappable[T]
-with TypedSource[T] with HasFilterPredicate {
-
-  import scala.collection.JavaConverters._
-  def converterImpl: TupleConverter[T]// with MacroGenerated
-
-  def schema: SchemaWrapper[T]
-
-  override def converter[U >: T] = TupleConverter.asSuperConverter[T, U](converterImpl)
-
-//  val names = schema.get.getAllStructFieldNames.asScala
-//  val fields = new Fields(names: _*)
-  val fields = Fields.size(schema.get.getAllStructFieldNames.size)
-  val scheme = new OrcFile(schema.get, withFilter.orNull, fields, schema.get, new CascadingConverterFactory)
-
-
-
-  override def hdfsScheme = {
-    import scala.collection.JavaConverters._
-    // FIXME: First column is projection
-//        val names = schema.get.getAllStructFieldNames.asScala
-//        val fields = new Fields(names: _*)
-//    val scheme = new OrcFile(schema.get, withFilter.orNull, Fields.size(schema.get.getAllStructFieldNames.size), schema.get,
-//    //val scheme = new OrcFile(schema.get, withFilter.orNull, fields, schema.get,
-//      new CascadingConverterFactory)
-    HadoopSchemeInstance(scheme.asInstanceOf[Scheme[_, _, _, _, _]])
-  }
-}*/
 
 // TODO:
 trait HasFilterPredicate {
   def withFilter: Option[SearchArgument] = None
 }
 
-//class TypedFixedPathOrcTuple[T](val paths: Seq[String], val schema: SchemaWrapper[T], val converterImpl: TupleConverter[T])
-//  extends FixedPathSource(paths: _*) with TypedOrc[T]
-class TypedFixedPathOrcTuple[T](val paths: Seq[String], val schema: SchemaWrapper[T], val converterImpl: TupleConverter[T], val setterImpl: TupleSetter[T])
+class TypedFixedPathOrcTuple[T](
+   val paths: Seq[String],
+   val schema: SchemaWrapper[T],
+   val converterImpl: TupleConverter[T],
+   val setterImpl: TupleSetter[T])
   extends FixedPathSource(paths: _*) with TypedOrc[T]
