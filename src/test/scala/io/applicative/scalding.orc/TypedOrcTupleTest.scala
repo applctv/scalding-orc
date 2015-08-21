@@ -3,10 +3,14 @@ package io.applicative.scalding.orc
 import java.io.File
 
 import cascading.operation.DebugLevel
+import cascading.tuple.Fields
+import com.hotels.corc.cascading.SearchArgumentFactory
 import com.twitter.scalding.typed.TypedPipe
 import com.twitter.scalding._
 import com.twitter.scalding.platform.HadoopPlatformJobTest
 import com.twitter.scalding.platform.HadoopPlatformTest
+import io.applicative.scalding.orc.TypedOrc
+import org.apache.hadoop.hive.ql.io.sarg.SearchArgument
 import org.scalatest.{Matchers, WordSpec}
 import scala.language.experimental.macros
 
@@ -84,12 +88,12 @@ class TypedOrcTupleTest extends WordSpec with Matchers with HadoopPlatformTest {
         .sink[SampleClassB](TypedOrc[SampleClassB](Seq("output1"))) {
         toMap(_) shouldBe toMap(values)
       }.run
-//
-//      HadoopPlatformJobTest(new ReadWithFilterPredicateJob(_), cluster)
-//        .arg("input", "output1")
-//        .arg("output", "output2")
-//        .sink[Boolean]("output2") { toMap(_) shouldBe toMap(values.filter(_.string == "B1").map(_.a.bool)) }
-//        .run
+
+      HadoopPlatformJobTest(new ReadWithFilterPredicateJob(_), cluster)
+        .arg("input", "output1")
+        .arg("output", "output2")
+        .sink[Boolean]("output2") { toMap(_) shouldBe toMap(values.filter(_.string == "B1").map(_.a.bool)) }
+        .run
     }
   }
 }
@@ -204,15 +208,18 @@ class WriteToTypedOrcTupleJobB(args: Args) extends Job(args) {
   TypedPipe.from(values).write(sink)
 }
 
-//class ReadWithFilterPredicateJob(args: Args) extends Job(args) {
-//  import com.twitter.scalding.macros.Macros._
-//  //val fp: FilterPredicate = FilterApi.eq(binaryColumn("string"), Binary.fromString("B1"))
-//
-//  val inputPath = args.required("input")
-//  val outputPath = args.required("output")
-//
-//  //val input = TypedOrc[SampleClassC](inputPath, fp)
-//  val input = TypedOrc[SampleClassC](inputPath)
-//
-//  TypedPipe.from(input).map(_.a.bool).write(TypedTsv[Boolean](outputPath))
-//}
+class ReadWithFilterPredicateJob(args: Args) extends Job(args) {
+  import MacroImplicits._
+  val fp: SearchArgument = SearchArgumentFactory.newBuilder()
+    .startAnd()
+    .equals(new Fields("string", classOf[String]), "B1")
+    .end()
+    .build()
+
+  val inputPath = args.required("input")
+  val outputPath = args.required("output")
+
+  val input = TypedOrc[SampleClassC](inputPath, fp)
+
+  TypedPipe.from(input).map(_.a.bool).write(TypedTsv[Boolean](outputPath))
+}

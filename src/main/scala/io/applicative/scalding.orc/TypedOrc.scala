@@ -28,32 +28,19 @@ object TypedOrc {
   /**
    * Create readable typed ORC source with filter predicate.
    */
-  //FIXME
-//  def apply[T](paths: Seq[String], fp: SearchArgument)
-//              (implicit converterImpl: TupleConverter[T], setterImpl: TupleSetter[T]): TypedOrc[T] =
-//    new TypedFixedPathOrcTuple[T](paths, null, converterImpl) {
-//      override def withFilter = Some(fp)
-//    }
+  def apply[T](paths: Seq[String], fp: SearchArgument)
+              (implicit converterImpl: TupleConverter[T],
+               setterImpl: TupleSetter[T],
+               schema: SchemaWrapper[T]): TypedOrc[T] =
+    new TypedFixedPathOrcTuple[T](paths, schema, converterImpl, setterImpl) {
+      override def withFilter = Some(fp)
+    }
 
-  // FIXME
-//  def apply[T](path: String, fp: SearchArgument)
-//              (implicit converterImpl: TupleConverter[T]): TypedOrc[T] =
-//    apply[T](Seq(path), fp)
+  def apply[T](path: String, fp: SearchArgument)
+              (implicit converterImpl: TupleConverter[T],
+               setterImpl: TupleSetter[T],
+               schema: SchemaWrapper[T]): TypedOrc[T] = apply[T](Seq(path), fp)
 }
-
-/*object TypedOrcSink {
-
-  def apply[T](paths: Seq[String])
-              (implicit converterImpl: TupleConverter[T],
-               setterImpl: TupleSetter[T],
-               schema: SchemaWrapper[T]): TypedOrcSink[T] =
-    new TypedFixedPathOrcSink[T](paths, schema, converterImpl, setterImpl)
-
-  def apply[T](path: String)
-              (implicit converterImpl: TupleConverter[T],
-               setterImpl: TupleSetter[T],
-               schema: SchemaWrapper[T]): TypedOrcSink[T] = apply[T](Seq(path))
-}*/
 
 /**
  * Typed Orc tuple source/sink.
