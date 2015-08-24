@@ -7,8 +7,7 @@ import cascading.tuple.Fields
 import com.hotels.corc.cascading.SearchArgumentFactory
 import com.twitter.scalding.typed.TypedPipe
 import com.twitter.scalding._
-import com.twitter.scalding.platform.HadoopPlatformJobTest
-import com.twitter.scalding.platform.HadoopPlatformTest
+import com.twitter.scalding.platform.{LocalCluster, HadoopPlatformJobTest, HadoopPlatformTest}
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument
 import org.scalatest.{Matchers, WordSpec}
 import scala.language.experimental.macros
@@ -16,6 +15,19 @@ import scala.language.experimental.macros
 import MacroImplicits._
 
 class TypedOrcTupleTest extends WordSpec with Matchers with HadoopPlatformTest {
+
+  override def initialize() = {
+    val temp = cluster.initialize()
+    cluster.addClassSourceToClassPath(classOf[com.twitter.bijection.Injection[_, _]])
+    cluster.addClassSourceToClassPath(classOf[com.twitter.bijection.macros.MacroGenerated])
+    cluster.addClassSourceToClassPath(classOf[com.twitter.scalding.serialization.Boxed[_]])
+    cluster.addClassSourceToClassPath(classOf[com.hotels.corc.mapred.CorcOutputFormat])
+    cluster.addClassSourceToClassPath(classOf[com.hotels.corc.cascading.OrcFile])
+    cluster.addClassSourceToClassPath(classOf[com.hotels.corc.Corc])
+    cluster.addClassSourceToClassPath(classOf[org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo])
+    cluster.addClassSourceToClassPath(classOf[org.apache.hadoop.hdfs.DFSClient])
+    temp
+  }
 
   "TypedOrcTuple" should {
 
@@ -26,7 +38,6 @@ class TypedOrcTupleTest extends WordSpec with Matchers with HadoopPlatformTest {
       HadoopPlatformJobTest(new WriteToTypedOrcTupleJobA(_), cluster)
         .arg("output", "output1")
         .sink(TypedOrc[SampleClassD](Seq("output1"))) { out =>
-          out.foreach(println)
           val map = out.map(sampleClassD => (sampleClassD.x, sampleClassD.y)).toMap
           map(1) should equal("a")
           map(2) should equal("b")
@@ -40,7 +51,6 @@ class TypedOrcTupleTest extends WordSpec with Matchers with HadoopPlatformTest {
       HadoopPlatformJobTest(new WriteToTypedOrcTupleJobE(_), cluster)
         .arg("output", "output1")
         .sink(TypedOrc[SampleClassE](Seq("output1"))) { out =>
-        out.foreach(println)
         out.size should be(2)
         out.head.a should be("a")
       }.run
