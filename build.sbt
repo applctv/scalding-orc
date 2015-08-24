@@ -6,6 +6,9 @@ scalaVersion := "2.11.6"
 
 version := "0.0.1"
 
+// Hadoop mini-cluster locking prevents parallel execution
+parallelExecution in Test := false
+
 resolvers ++= Seq(
   "Concurrent Maven Repo" at "http://conjars.org/repo",
   "Clojars Repo" at "http://clojars.org/repo",
