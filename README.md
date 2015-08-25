@@ -3,6 +3,8 @@ scalding-orc
 
 This project provides read and write support for [ORC file format](https://orc.apache.org/) in [Scalding](https://gihub.com/twitter/scalding/).
 
+[![Build Status](https://travis-ci.org/applctv/scalding-orc.svg?branch=master)](https://travis-ci.org/applctv/scalding-orc)
+
 # Basics
 Define a case class with schema matching that of your source or sink. Member names should match the column names in the schema, and their types should correspond.
 Nested schemas as well as Arrays/Lists and Maps are supported.

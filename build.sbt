@@ -6,6 +6,14 @@ scalaVersion := "2.11.6"
 
 version := "0.0.1"
 
+licenses += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0.html"))
+
+bintrayOrganization := Some("applctv")
+
+bintrayRepository := "scalding-orc"
+
+bintrayVcsUrl := Some("git@github.com:applctv/scalding-orc.git")
+
 // Hadoop mini-cluster locking prevents parallel execution
 parallelExecution in Test := false
 
