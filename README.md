@@ -27,7 +27,7 @@ To eliminate unneeded columns, only define the relevant fields in your case clas
 
 # Predicate pushdown
 
-Note: predicate pushdown is a hint to the Orc Reader to skip some rows, but is not a strict filter. See [this issue](https://github.com/HotelsDotCom/corc/issues/12) for more details.
+Predicate pushdown is a hint to the Orc Reader to skip some rows.
 
 ```
 val fp = org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactoy.newBuilder

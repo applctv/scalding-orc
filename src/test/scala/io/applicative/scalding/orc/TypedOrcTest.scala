@@ -45,10 +45,7 @@ class TypedOrcTupleTest extends BaseTest {
       HadoopPlatformJobTest(new ReadWithFilterPredicateJob(_), cluster)
         .arg("input", "output1")
         .arg("output", "output2")
-        // FIXME: For now predicate pushdown is just an optimization
-        // See https://github.com/HotelsDotCom/corc/issues/12
-        //.sink[Boolean]("output2") { toMap(_) shouldBe toMap(values.filter(_.string == "B1").map(_.a.bool)) }
-        .sink[Boolean]("output2") { toMap(_) shouldBe toMap(values.map(_.a.bool)) }
+        .sink[Boolean]("output2") { toMap(_) shouldBe toMap(values.filter(_.string == "B1").map(_.a.bool)) }
         .run
     }
   }
