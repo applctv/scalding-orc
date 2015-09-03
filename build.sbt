@@ -4,7 +4,7 @@ organization := "io.applicative"
 
 scalaVersion := "2.11.6"
 
-version := "0.0.1"
+version := "0.0.2"
 
 licenses += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0.html"))
 
@@ -16,6 +16,19 @@ bintrayVcsUrl := Some("git@github.com:applctv/scalding-orc.git")
 
 // Hadoop mini-cluster locking prevents parallel execution
 parallelExecution in Test := false
+
+// Publish settings for Maven Central
+publishMavenStyle := true
+pomExtra := (
+    <url>https://github.com/applctv/scalding-orc/</url>
+    <developers>
+      <developer>
+        <id>applctv</id>
+        <name>Applicative</name>
+        <url>http://applicative.io</url>
+      </developer>
+    </developers>)
+
 
 resolvers ++= Seq(
   "Concurrent Maven Repo" at "http://conjars.org/repo",
