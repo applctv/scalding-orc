@@ -4,7 +4,7 @@ organization := "io.applicative"
 
 scalaVersion := "2.11.6"
 
-version := "0.0.3"
+version := "0.0.4"
 
 licenses += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0.html"))
 
@@ -21,6 +21,10 @@ parallelExecution in Test := false
 publishMavenStyle := true
 pomExtra := (
     <url>https://github.com/applctv/scalding-orc/</url>
+    <scm>
+      <url>git@github.com:applctv/scalding-orc.git</url>
+      <connection>scm:git:git@github.com:applctv/scalding-orc.git</connection>
+    </scm>
     <developers>
       <developer>
         <id>applctv</id>
