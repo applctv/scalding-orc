@@ -2,9 +2,9 @@ name := "scalding.orc"
 
 organization := "io.applicative"
 
-scalaVersion := "2.11.6"
+scalaVersion := "2.11.7"
 
-version := "0.0.4"
+version := "0.0.5"
 
 licenses += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0.html"))
 
