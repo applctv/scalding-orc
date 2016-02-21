@@ -4,7 +4,7 @@ organization := "io.applicative"
 
 scalaVersion := "2.11.7"
 
-version := "0.0.5"
+version := "0.0.6"
 
 licenses += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0.html"))
 
